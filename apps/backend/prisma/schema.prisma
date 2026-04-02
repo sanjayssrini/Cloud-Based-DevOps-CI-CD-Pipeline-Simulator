@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum ProjectType {
+  NODE
+  PYTHON
+  STATIC
+  UNKNOWN
+}
+
+enum StageType {
+  BUILD
+  TEST
+  DEPLOY
+  CUSTOM
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum EnvironmentType {
+  DEV
+  STAGING
+  PROD
+}
+
+enum TutorialStepType {
+  ACTION
+  VALIDATION
+  OBSERVATION
+}
+
+model User {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  passwordHash   String
+  name           String
+  role           Role        @default(STUDENT)
+  refreshToken   String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  projects       Project[]
+  labs           Lab[]       @relation("InstructorLabs")
+  progress       Progress[]
+  badges         UserBadge[]
+  pipelineRuns   PipelineRun[]
+  deployments    Deployment[]
+}
+
+model Project {
+  id             String      @id @default(cuid())
+  name           String
+  description    String?
+  type           ProjectType @default(UNKNOWN)
+  userId         String
+  uploadPath     String?
+  analysisJson   Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user           User        @relation(fields: [userId], references: [id])
+  repository     Repository?
+  pipeline       Pipeline?
+  artifacts      Artifact[]
+  environments   Environment[]
+}
+
+model Repository {
+  id             String      @id @default(cuid())
+  projectId      String      @unique
+  currentBranch  String      @default("main")
+  createdAt      DateTime    @default(now())
+
+  project        Project     @relation(fields: [projectId], references: [id])
+  branches       Branch[]
+  commits        Commit[]
+}
+
+model Branch {
+  id             String      @id @default(cuid())
+  name           String
+  repositoryId   String
+  headCommitId   String?
+  createdAt      DateTime    @default(now())
+
+  repository     Repository  @relation(fields: [repositoryId], references: [id])
+  headCommit     Commit?     @relation("BranchHead", fields: [headCommitId], references: [id])
+
+  @@unique([name, repositoryId])
+}
+
+model Commit {
+  id             String      @id @default(cuid())
+  hash           String      @unique
+  message        String
+  repositoryId   String
+  parentCommitId String?
+  branchName     String
+  diffJson       Json?
+  createdAt      DateTime    @default(now())
+
+  repository     Repository  @relation(fields: [repositoryId], references: [id])
+  parentCommit   Commit?     @relation("CommitTree", fields: [parentCommitId], references: [id])
+  children       Commit[]    @relation("CommitTree")
+  headForBranches Branch[]   @relation("BranchHead")
+}
+
+model Pipeline {
+  id             String      @id @default(cuid())
+  projectId      String      @unique
+  configJson     Json
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  project        Project     @relation(fields: [projectId], references: [id])
+  stages         PipelineStage[]
+  runs           PipelineRun[]
+}
+
+model PipelineStage {
+  id             String      @id @default(cuid())
+  pipelineId     String
+  name           String
+  type           StageType
+  order          Int
+  conditionExpr  String?
+  retryCount     Int         @default(0)
+  timeoutSeconds Int         @default(30)
+  tasksJson      Json
+
+  pipeline       Pipeline    @relation(fields: [pipelineId], references: [id])
+
+  @@unique([pipelineId, order])
+}
+
+model PipelineRun {
+  id             String      @id @default(cuid())
+  pipelineId     String
+  userId         String
+  status         RunStatus   @default(QUEUED)
+  deterministicSeed Int      @default(42)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  resultJson     Json?
+
+  pipeline       Pipeline    @relation(fields: [pipelineId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+  logs           Log[]
+  deployments    Deployment[]
+}
+
+model Log {
+  id             String      @id @default(cuid())
+  runId          String
+  stageName      String
+  level          String
+  message        String
+  ansiMessage    String
+  sequence       Int
+  createdAt      DateTime    @default(now())
+
+  run            PipelineRun @relation(fields: [runId], references: [id])
+
+  @@unique([runId, sequence])
+}
+
+model Artifact {
+  id             String      @id @default(cuid())
+  projectId      String
+  runId          String?
+  name           String
+  path           String
+  metadataJson   Json?
+  createdAt      DateTime    @default(now())
+
+  project        Project     @relation(fields: [projectId], references: [id])
+}
+
+model Environment {
+  id             String          @id @default(cuid())
+  projectId      String
+  type           EnvironmentType
+  baseUrl        String
+  isActive       Boolean         @default(false)
+
+  project        Project         @relation(fields: [projectId], references: [id])
+  deployments    Deployment[]
+
+  @@unique([projectId, type])
+}
+
+model Deployment {
+  id             String      @id @default(cuid())
+  runId          String
+  projectId      String
+  userId         String
+  environmentId  String
+  deploymentUrl  String
+  status         String
+  createdAt      DateTime    @default(now())
+
+  run            PipelineRun  @relation(fields: [runId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  environment    Environment  @relation(fields: [environmentId], references: [id])
+}
+
+model Lab {
+  id             String      @id @default(cuid())
+  title          String
+  description    String
+  instructorId   String
+  createdAt      DateTime    @default(now())
+
+  instructor     User        @relation("InstructorLabs", fields: [instructorId], references: [id])
+  steps          LabStep[]
+  rules          ValidationRule[]
+  progress       Progress[]
+}
+
+model LabStep {
+  id             String           @id @default(cuid())
+  labId          String
+  order          Int
+  title          String
+  content        String
+  stepType       TutorialStepType
+  hint           String?
+
+  lab            Lab              @relation(fields: [labId], references: [id])
+
+  @@unique([labId, order])
+}
+
+model ValidationRule {
+  id             String      @id @default(cuid())
+  labId          String
+  stepOrder      Int
+  ruleType       String
+  expectedJson   Json
+
+  lab            Lab         @relation(fields: [labId], references: [id])
+}
+
+model Progress {
+  id             String      @id @default(cuid())
+  userId         String
+  labId          String
+  currentStep    Int         @default(1)
+  completed      Boolean     @default(false)
+  score          Int         @default(0)
+  streak         Int         @default(0)
+  updatedAt      DateTime    @updatedAt
+
+  user           User        @relation(fields: [userId], references: [id])
+  lab            Lab         @relation(fields: [labId], references: [id])
+
+  @@unique([userId, labId])
+}
+
+model Badge {
+  id             String      @id @default(cuid())
+  code           String      @unique
+  name           String
+  description    String
+  threshold      Int
+
+  users          UserBadge[]
+}
+
+model UserBadge {
+  id             String      @id @default(cuid())
+  userId         String
+  badgeId        String
+  awardedAt      DateTime    @default(now())
+
+  user           User        @relation(fields: [userId], references: [id])
+  badge          Badge       @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+}

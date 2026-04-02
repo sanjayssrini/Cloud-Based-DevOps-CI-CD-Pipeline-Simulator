@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f5fafc;
+  --panel: #ffffff;
+  --text: #0d1b2a;
+  --muted: #4c647a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+}
+
+.grid-noise {
+  background-image:
+    linear-gradient(rgba(13, 27, 42, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13, 27, 42, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
