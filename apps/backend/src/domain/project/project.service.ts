@@ -5,9 +5,15 @@ import { Prisma, ProjectType, StageType } from "@prisma/client";
 import { prisma } from "../../infrastructure/prisma.js";
 import { ProjectAnalysisService } from "./project-analysis.service.js";
 import { BuildEngineService, type BuildPlan } from "./build-engine.service.js";
+import { GitHubImportService } from "./github-import.service.js";
+import { BuildScriptMemoryService } from "./build-script-memory.service.js";
+import { TestCaseMemoryService } from "./test-case-memory.service.js";
 
 const analysis = new ProjectAnalysisService();
 const buildEngine = new BuildEngineService();
+const githubImport = new GitHubImportService();
+const buildScriptMemory = new BuildScriptMemoryService();
+const testCaseMemory = new TestCaseMemoryService();
 
 type SupportedScriptLanguage = "dockerfile" | "bash" | "yaml";
 
@@ -661,5 +667,166 @@ export class ProjectService {
     }
 
     return files;
+  }
+
+  async importFromGithub(projectId: string, userId: string, options: { repository: string; token?: string; branch?: string }) {
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId }
+    });
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Clone and analyze the GitHub repository
+    const importData = await githubImport.cloneAndAnalyze(projectId, options);
+
+    // Setup repository in database
+    await prisma.repository.upsert({
+      where: { projectId },
+      create: {
+        projectId,
+        currentBranch: importData.branch,
+        branches: {
+          create: {
+            name: importData.branch
+          }
+        }
+      },
+      update: {
+        currentBranch: importData.branch
+      }
+    });
+
+    // Create or update pipeline
+    const mappedStages = importData.autoConfig.stages.map((stage: any) => ({
+      name: stage.name,
+      type: stage.type as StageType,
+      order: stage.order,
+      conditionExpr: stage.conditionExpr,
+      retryCount: stage.retryCount,
+      timeoutSeconds: stage.timeoutSeconds,
+      tasksJson: stage.tasks as unknown as Prisma.InputJsonValue
+    }));
+
+    const pipeline = await prisma.pipeline.upsert({
+      where: { projectId },
+      create: {
+        projectId,
+        configJson: importData.autoConfig as unknown as Prisma.InputJsonValue,
+        stages: {
+          create: mappedStages
+        }
+      },
+      update: {
+        configJson: importData.autoConfig as unknown as Prisma.InputJsonValue,
+        stages: {
+          deleteMany: {},
+          create: mappedStages
+        }
+      },
+      include: { stages: { orderBy: { order: "asc" } } }
+    });
+
+    // Update project with import metadata
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        type: importData.type as ProjectType,
+        analysisJson: {
+          projectRoot: importData.projectRoot,
+          dependencies: importData.dependencies,
+          buildSteps: importData.buildSteps,
+          sourceType: "github",
+          repository: options.repository,
+          branch: options.branch || "main"
+        } as Prisma.InputJsonValue
+      },
+      include: {
+        repository: true,
+        pipeline: true
+      }
+    });
+
+    return {
+      ...updatedProject,
+      autoPipeline: pipeline
+    };
+  }
+
+  async validateGithubRepository(repository: string, token?: string) {
+    return githubImport.validateRepository(repository, token);
+  }
+
+  async getGithubRepositoryInfo(repository: string, token?: string) {
+    return githubImport.getRepositoryMetadata(repository, token);
+  }
+
+  async getGithubRepositoryBranches(repository: string, token?: string) {
+    return githubImport.listBranches(repository, token);
+  }
+
+  // Build Script Memory Methods
+  async getUserBuildScriptMemory(userId: string) {
+    return buildScriptMemory.getUserBuildScriptMemory(userId);
+  }
+
+  async getProjectBuildScriptMemory(projectId: string, userId: string) {
+    // Verify project ownership
+    await this.verifyProjectAccess(projectId, userId);
+    return buildScriptMemory.getProjectBuildScriptMemory(projectId, userId);
+  }
+
+  async getFrequentlyUsedScripts(userId: string, limit: number = 10) {
+    return buildScriptMemory.getFrequentlyUsedScripts(userId, limit);
+  }
+
+  async toggleFavoriteBuildScript(projectId: string, userId: string, scriptId: string, isFavorite: boolean) {
+    // Verify project ownership
+    await this.verifyProjectAccess(projectId, userId);
+    return buildScriptMemory.toggleFavoriteScript(scriptId, userId, isFavorite);
+  }
+
+  // Test Case Memory Methods
+  async getUserTestCaseMemory(userId: string) {
+    return testCaseMemory.getUserTestCaseMemory(userId);
+  }
+
+  async getProjectTestCaseMemory(projectId: string, userId: string) {
+    // Verify project ownership
+    await this.verifyProjectAccess(projectId, userId);
+    return testCaseMemory.getProjectTestCaseMemory(projectId, userId);
+  }
+
+  async getFrequentlyUsedTestCases(userId: string, limit: number = 10) {
+    return testCaseMemory.getFrequentlyUsedTestCases(userId, limit);
+  }
+
+  async toggleFavoriteTestCase(projectId: string, userId: string, testCaseId: string, isFavorite: boolean) {
+    // Verify project ownership
+    await this.verifyProjectAccess(projectId, userId);
+    return testCaseMemory.toggleFavoriteTestCase(testCaseId, userId, isFavorite);
+  }
+
+  async getTestCaseExecutionHistory(testCaseId: string, limit: number = 20) {
+    return testCaseMemory.getTestCaseExecutionHistory(testCaseId, limit);
+  }
+
+  async getTestTemplates(projectType: string) {
+    return testCaseMemory.getTestTemplates(projectType);
+  }
+
+  // Helper method to verify project access
+  private async verifyProjectAccess(projectId: string, userId: string) {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId }
+    });
+
+    if (!project) {
+      throw new Error("Project not found or access denied");
+    }
+
+    return project;
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { RepositoryDetails } from "./repository-details";
@@ -99,6 +100,7 @@ const buildInitialTests = (projectId: string, workspace: WorkspaceSnapshot | und
 };
 
 export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [buildScript, setBuildScript] = useState<BuildScript | null>(null);
@@ -347,7 +349,47 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
         )}
 
         {activeTab === "deployment" && (
-          <DeploymentSimulator projectId={projectId} pipelineId={pipelineId} />
+          <div className="space-y-6">
+            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50 p-8 text-center">
+              <div className="mb-6">
+                <div className="text-6xl mb-4">🚀</div>
+                <h2 className="text-3xl font-bold text-slate-900 mb-2">Deployment Center</h2>
+                <p className="text-lg text-slate-600 mb-4">
+                  Multi-environment deployment simulator with realistic CI/CD pipelines
+                </p>
+                <p className="text-slate-500 mb-6">
+                  Deploy to Development, Staging, or Production environments. Monitor deployments with detailed logs and rollback capabilities.
+                </p>
+              </div>
+
+              <div className="space-y-4 max-w-md mx-auto">
+                <button
+                  onClick={() => router.push(`/dashboard/deployment?projectId=${projectId}`)}
+                  className="w-full rounded-lg bg-brand-ocean px-6 py-4 text-lg font-bold text-white hover:bg-brand-ocean/90 transition-colors shadow-md"
+                >
+                  🚀 Open Deployment Center
+                </button>
+                <p className="text-sm text-slate-600">
+                  This will open a comprehensive deployment page with real-time monitoring and metrics
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3 max-w-2xl mx-auto">
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="font-semibold text-slate-900">📊 Real-time Metrics</p>
+                  <p className="text-sm text-slate-600 mt-1">Track success rates and deployment times</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="font-semibold text-slate-900">↩️ Easy Rollback</p>
+                  <p className="text-sm text-slate-600 mt-1">Instantly rollback to previous versions</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="font-semibold text-slate-900">📜 Full History</p>
+                  <p className="text-sm text-slate-600 mt-1">Complete deployment audit trail</p>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

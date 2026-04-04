@@ -196,31 +196,64 @@ model Artifact {
 }
 
 model Environment {
-  id             String          @id @default(cuid())
-  projectId      String
-  type           EnvironmentType
-  baseUrl        String
-  isActive       Boolean         @default(false)
+  id                    String          @id @default(cuid())
+  projectId             String
+  type                  EnvironmentType
+  name                  String
+  baseUrl               String
+  isActive              Boolean         @default(false)
+  currentVersion        String          @default("v1.0.0")
+  lastDeploymentAt      DateTime?
+  metadata              Json?
 
-  project        Project         @relation(fields: [projectId], references: [id])
-  deployments    Deployment[]
+  project               Project         @relation(fields: [projectId], references: [id])
+  deployments           Deployment[]
 
   @@unique([projectId, type])
 }
 
+enum DeploymentStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  FAILED
+  CANCELLED
+  ROLLBACK_IN_PROGRESS
+  ROLLBACK_SUCCESS
+  ROLLBACK_FAILED
+}
+
 model Deployment {
-  id             String      @id @default(cuid())
-  runId          String
-  projectId      String
+  id             String              @id @default(cuid())
+  runId          String?
   userId         String
   environmentId  String
-  deploymentUrl  String
-  status         String
+  version        String
+  status         DeploymentStatus    @default(PENDING)
+  duration       Int?                // in seconds
+  startedAt      DateTime            @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  run            PipelineRun?        @relation(fields: [runId], references: [id])
+  user           User                @relation(fields: [userId], references: [id])
+  environment    Environment         @relation(fields: [environmentId], references: [id])
+  logs           DeploymentLog[]
+}
+
+model DeploymentLog {
+  id             String      @id @default(cuid())
+  deploymentId   String
+  stageName      String
+  message        String
+  level          String      @default("INFO")
+  sequence       Int
   createdAt      DateTime    @default(now())
 
-  run            PipelineRun  @relation(fields: [runId], references: [id])
-  user           User         @relation(fields: [userId], references: [id])
-  environment    Environment  @relation(fields: [environmentId], references: [id])
+  deployment     Deployment  @relation(fields: [deploymentId], references: [id])
+
+  @@unique([deploymentId, sequence])
 }
 
 model Lab {
