@@ -1,7 +1,8 @@
 import axios from "axios";
+import { api as backendApi } from "./api";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api",
+  baseURL: backendApi.defaults.baseURL || "http://localhost:4000",
   withCredentials: true
 });
 

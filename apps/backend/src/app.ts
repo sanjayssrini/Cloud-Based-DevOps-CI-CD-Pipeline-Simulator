@@ -19,7 +19,7 @@ export const app = express();
 
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: env.NODE_ENV === "production" ? env.FRONTEND_URL : true,
     credentials: true
   })
 );

@@ -13,31 +13,34 @@ Production-grade, fully simulated DevOps learning platform built with Next.js + 
    ```bash
    npm install
    ```
-2. Configure backend env in `apps/backend/.env`:
+2. Start PostgreSQL in Docker:
+   ```bash
+   docker run --name devops-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=<YOUR_PASSWORD> -e POSTGRES_DB=devops_sim -p 5432:5432 -d postgres:16-alpine
+   ```
+3. Configure backend env in `apps/backend/.env`:
    ```env
    DATABASE_URL="postgresql://postgres:<PASSWORD>@localhost:5432/devops_sim?schema=public"
    JWT_ACCESS_SECRET="access-secret"
    JWT_REFRESH_SECRET="refresh-secret"
    PORT=4000
+   HOST="0.0.0.0"
    FRONTEND_URL="http://localhost:3000"
    ```
-3. Generate Prisma client and migrate:
+   For LAN access, set `FRONTEND_URL` to your frontend network origin (example: `http://192.168.1.25:3000`).
+4. Generate Prisma client and migrate:
    ```bash
    npm run prisma:generate
    npm run prisma:migrate
    ```
-4. Install Playwright browsers for the webpage tests:
+5. Install Playwright browsers for the webpage tests:
    ```bash
    npx playwright install chromium
    ```
-5. Run backend:
+6. Run both apps in one terminal:
    ```bash
-   npm run dev:backend
+   npm run dev
    ```
-6. Run frontend:
-   ```bash
-   npm run dev:frontend
-   ```
+   Use `npm run dev:backend` or `npm run dev:frontend` only if you want to start one service by itself.
 
 ## Webpage Tests
 
@@ -80,9 +83,3 @@ The platform now includes a **Build Stage Engine** (NEW!) featuring:
 - ✅ Terminal output with timestamps, colors, and log sources
 - ✅ Complete artifact generation
 
-**Get Started:**
-- 📖 [BUILD_ENGINE_QUICKSTART.md](BUILD_ENGINE_QUICKSTART.md) - User guide
-- 📚 [BUILD_ENGINE_GUIDE.md](BUILD_ENGINE_GUIDE.md) - Technical reference
-- 🔧 [BUILD_ENGINE_DELIVERY.md](BUILD_ENGINE_DELIVERY.md) - Feature overview
-
-See app-level READMEs for details.

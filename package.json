@@ -6,7 +6,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w backend & npm run dev -w frontend",
+    "dev": "node scripts/dev-runner.mjs",
     "dev:backend": "npm run dev -w backend",
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w backend && npm run build -w frontend",
@@ -20,6 +20,7 @@
     "test:webpage:dashboard": "playwright test --config test/playwright.config.ts test/dashboard.spec.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.41.2"
+    "@playwright/test": "^1.41.2",
+    "concurrently": "^9.2.1"
   }
 }

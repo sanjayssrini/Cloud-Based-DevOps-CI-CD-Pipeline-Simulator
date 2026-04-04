@@ -1,5 +1,6 @@
 import "dotenv/config";
 import http from "node:http";
+import os from "node:os";
 import { Server } from "socket.io";
 import { app } from "./app.js";
 import { env } from "./config/env.js";
@@ -9,7 +10,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: env.FRONTEND_URL,
+    origin: env.NODE_ENV === "production" ? env.FRONTEND_URL : true,
     credentials: true
   }
 });
@@ -36,6 +37,13 @@ server.on("error", (error: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-server.listen(env.PORT, () => {
+server.listen(env.PORT, env.HOST, () => {
+  const networkAddress = Object.values(os.networkInterfaces())
+    .flat()
+    .find((iface) => iface?.family === "IPv4" && !iface.internal)?.address;
+
   console.log(`Backend listening on http://localhost:${env.PORT}`);
+  if (networkAddress) {
+    console.log(`Backend LAN URL: http://${networkAddress}:${env.PORT}`);
+  }
 });

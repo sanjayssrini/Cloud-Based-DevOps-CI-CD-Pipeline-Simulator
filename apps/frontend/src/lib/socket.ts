@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
+import { api } from "./api";
 
-export const socket = io(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000", {
+export const socket = io(api.defaults.baseURL ?? "http://localhost:4000", {
   autoConnect: false
 });

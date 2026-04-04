@@ -3,6 +3,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import axios from "axios";
 import { ProjectAnalysisService } from "./project-analysis.service.js";
+import { HttpError } from "../../shared/httpError.js";
 
 interface GitHubImportOptions {
   repository: string; // owner/repo format
@@ -21,19 +22,21 @@ export class GitHubImportService {
     fs.mkdirSync(extractDir, { recursive: true });
 
     try {
+      const normalizedRepository = this.normalizeRepositoryPath(options.repository);
+
       // Construct GitHub URL
-      let repoUrl = `https://github.com/${options.repository}.git`;
+      let repoUrl = `https://github.com/${normalizedRepository}.git`;
       
       // If token is provided, use it for authentication (supports private repos)
       if (options.token) {
-        repoUrl = `https://${options.token}@github.com/${options.repository}.git`;
+        repoUrl = `https://${options.token}@github.com/${normalizedRepository}.git`;
       }
 
       // Clone the repository
       const branch = options.branch || "main";
       const cloneCommand = `git clone --depth 1 --branch ${branch} ${repoUrl} "${extractDir}"`;
       
-      console.log(`Cloning repository from GitHub: ${options.repository} (branch: ${branch})`);
+      console.log(`Cloning repository from GitHub: ${normalizedRepository} (branch: ${branch})`);
       execSync(cloneCommand, { stdio: "pipe", timeout: 60000 });
 
       // Remove .git directory to save space
@@ -57,7 +60,7 @@ export class GitHubImportService {
         buildSteps,
         autoConfig,
         sourceType: "github" as const,
-        repository: options.repository,
+        repository: normalizedRepository,
         branch
       };
     } catch (error) {
@@ -68,11 +71,22 @@ export class GitHubImportService {
         fs.rmSync(extractDir, { recursive: true, force: true });
       }
 
-      throw new Error(
-        error instanceof Error
-          ? `Failed to import from GitHub: ${error.message}`
-          : "Failed to import repository from GitHub"
-      );
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        if (message.includes("repository") && message.includes("not found")) {
+          throw new HttpError(404, "Repository not found or inaccessible");
+        }
+        if (message.includes("remote branch") && message.includes("not found")) {
+          throw new HttpError(400, "Selected branch does not exist");
+        }
+        throw new HttpError(502, `Failed to import from GitHub: ${error.message}`);
+      }
+
+      throw new HttpError(502, "Failed to import repository from GitHub");
     }
   }
 
@@ -133,16 +147,21 @@ export class GitHubImportService {
         topics: data.topics || []
       };
     } catch (error) {
-      console.error("Failed to fetch repository metadata:", error);
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 404) {
-          throw new Error("Repository not found");
+          throw new HttpError(404, "Repository not found");
         }
         if (error.response?.status === 401) {
-          throw new Error("Invalid GitHub token or insufficient permissions");
+          throw new HttpError(401, "Invalid GitHub token or insufficient permissions");
         }
+        if (error.response?.status === 403) {
+          throw new HttpError(403, "GitHub API rate limit exceeded or access denied");
+        }
+        console.error("Failed to fetch repository metadata:", error);
+        throw new HttpError(502, "Unable to fetch repository information from GitHub");
       }
-      throw new Error("Failed to fetch repository information from GitHub");
+      console.error("Failed to fetch repository metadata:", error);
+      throw new HttpError(500, "Failed to fetch repository information from GitHub");
     }
   }
 
@@ -180,20 +199,32 @@ export class GitHubImportService {
    * Normalize repository path (handle full URLs and owner/repo format)
    */
   private normalizeRepositoryPath(repository: string): string {
+    const trimmedRepository = repository.trim();
+
+    if (!trimmedRepository) {
+      throw new HttpError(400, "Repository is required");
+    }
+
     // If it's already in owner/repo format, return as-is
-    if (!repository.includes("://") && repository.includes("/")) {
-      const parts = repository.split("/");
-      return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`.replace(/\.git$/, "");
+    if (!trimmedRepository.includes("://") && trimmedRepository.includes("/")) {
+      const parts = trimmedRepository.split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`.replace(/\.git$/, "");
+      }
     }
 
     // If it's a full GitHub URL, extract owner/repo
-    if (repository.includes("github.com/")) {
-      const match = repository.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?(?:\/)?$/);
+    if (trimmedRepository.includes("github.com/")) {
+      const match = trimmedRepository.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?(?:\/)?$/);
       if (match) {
         return match[1];
       }
     }
 
-    return repository;
+    if (/^[^/\s]+\/[^/\s]+$/.test(trimmedRepository)) {
+      return trimmedRepository.replace(/\.git$/, "");
+    }
+
+    throw new HttpError(400, "Repository must be a GitHub URL or owner/repo path");
   }
 }

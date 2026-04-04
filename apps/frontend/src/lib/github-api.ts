@@ -40,7 +40,6 @@ export const githubApi = {
       });
       return data;
     } catch (error) {
-      console.error("Failed to fetch repository info:", error);
       return null;
     }
   },
