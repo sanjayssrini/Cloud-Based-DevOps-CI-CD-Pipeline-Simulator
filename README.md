@@ -80,9 +80,3 @@ The platform now includes a **Build Stage Engine** (NEW!) featuring:
 - ✅ Terminal output with timestamps, colors, and log sources
 - ✅ Complete artifact generation
 
-**Get Started:**
-- 📖 [BUILD_ENGINE_QUICKSTART.md](BUILD_ENGINE_QUICKSTART.md) - User guide
-- 📚 [BUILD_ENGINE_GUIDE.md](BUILD_ENGINE_GUIDE.md) - Technical reference
-- 🔧 [BUILD_ENGINE_DELIVERY.md](BUILD_ENGINE_DELIVERY.md) - Feature overview
-
-See app-level READMEs for details.
