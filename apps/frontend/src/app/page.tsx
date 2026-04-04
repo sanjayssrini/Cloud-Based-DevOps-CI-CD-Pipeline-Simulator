@@ -21,7 +21,7 @@ import { LoadingCtaButton } from "@/components/loading-cta-button";
 
 const coreFeatures = [
   {
-    icon: UploadCloud,
+    icon: Cloud,
     title: "Project Upload & Analysis",
     description: "Upload ZIP projects, inspect file structure, detect runtime type, and generate deterministic build steps."
   },

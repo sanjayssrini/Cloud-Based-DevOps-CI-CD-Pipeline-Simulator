@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import { useAppStore } from "@/store/app-store";
 
@@ -24,9 +24,8 @@ export default function LoginPage() {
       try {
         const { data } = await api.post("/auth/login", { email, password });
         return data;
-      } catch (error: any) {
-        const message = error.response?.data?.message || error.message || "Login failed";
-        throw new Error(message);
+      } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Login failed"));
       }
     },
     onSuccess: (data) => {

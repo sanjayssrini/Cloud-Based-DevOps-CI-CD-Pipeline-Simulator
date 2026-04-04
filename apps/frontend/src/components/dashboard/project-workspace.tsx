@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { RepositoryDetails } from "./repository-details";
 import { BuildScriptEditor } from "./build-script-editor";
 import { BuildRunner } from "./build-runner";
-import { PipelineSimulator } from "./pipeline-simulator";
 import { DeploymentSimulator } from "./deployment-simulator";
 import { TestCaseBuilder } from "./test-case-builder";
 import { TestRunner } from "./test-runner";
-import { useMutation } from "@tanstack/react-query";
 
-type Tab = "overview" | "repository" | "build" | "pipeline" | "tests" | "deployment";
+type Tab = "overview" | "repository" | "build" | "tests" | "deployment";
 
 interface BuildScript {
   id?: string;
@@ -29,14 +29,74 @@ interface TestCase {
 interface TestResult {
   id: string;
   name: string;
+  command: string;
   passed: boolean;
   output: string;
+  durationMs?: number;
+}
+
+interface WorkspaceSnapshot {
+  type?: "NODE" | "PYTHON" | "STATIC" | "UNKNOWN";
+  files?: Record<string, boolean>;
+  pipeline?: {
+    id: string;
+  } | null;
+}
+
+interface TestsRunResponse {
+  pipelineId: string | null;
+  results: TestResult[];
 }
 
 interface ProjectWorkspaceProps {
   projectId: string;
   onBack?: () => void;
 }
+
+const defaultNodeTests = [
+  { name: "Unit Tests", command: "npm test -- --runInBand", expected: "PASS" },
+  { name: "Integration Tests", command: "npm run test:integration", expected: "PASS" },
+  { name: "Lint Checks", command: "npm run lint", expected: "0 errors" }
+];
+
+const defaultPythonTests = [
+  { name: "Pytest Suite", command: "pytest -q", expected: "passed" },
+  { name: "Static Analysis", command: "python -m flake8 .", expected: "0" },
+  { name: "Import Smoke", command: "python -m pytest tests/smoke.py", expected: "passed" }
+];
+
+const defaultStaticTests = [
+  { name: "Static Smoke Test", command: "echo static smoke test", expected: "smoke" },
+  { name: "HTML Validation", command: "htmlhint .", expected: "valid" }
+];
+
+const buildInitialTests = (projectId: string, workspace: WorkspaceSnapshot | undefined): TestCase[] => {
+  const files = workspace?.files ?? {};
+  let templates = defaultNodeTests;
+
+  if (workspace?.type === "PYTHON" || files["requirements.txt"] || files["setup.py"]) {
+    templates = defaultPythonTests;
+  } else if (workspace?.type === "STATIC" && !files["package.json"]) {
+    templates = defaultStaticTests;
+  }
+
+  const seen = new Set<string>();
+  const suggestions = templates.filter((template) => {
+    const key = template.command.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+
+  return suggestions.map((template, index) => ({
+    id: `seed-${projectId}-${index + 1}`,
+    name: template.name,
+    command: template.command,
+    expected: template.expected
+  }));
+};
 
 export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -45,38 +105,79 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [testRunning, setTestRunning] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [testsInitialized, setTestsInitialized] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab("overview");
+    setPipelineId(null);
+    setBuildScript(null);
+    setTestCases([]);
+    setTestRunning(false);
+    setTestResults([]);
+    setTestsInitialized(false);
+  }, [projectId]);
+
+  const workspaceQuery = useQuery({
+    queryKey: ["project-workspace", projectId],
+    queryFn: async () => {
+      const { data } = await api.get(`/projects/${projectId}/workspace`);
+      return data as WorkspaceSnapshot;
+    },
+    enabled: Boolean(projectId)
+  });
+
+  useEffect(() => {
+    const existingPipelineId = workspaceQuery.data?.pipeline?.id;
+    if (existingPipelineId) {
+      setPipelineId(existingPipelineId);
+    }
+  }, [workspaceQuery.data?.pipeline?.id]);
+
+  useEffect(() => {
+    if (!workspaceQuery.data || testsInitialized) {
+      return;
+    }
+
+    setTestCases(buildInitialTests(projectId, workspaceQuery.data));
+    setTestsInitialized(true);
+  }, [workspaceQuery.data, projectId, testsInitialized]);
 
   const tabs: Array<{ id: Tab; label: string; icon: string; description: string }> = [
     { id: "overview", label: "Overview", icon: "🏠", description: "Project status and quick actions" },
     { id: "repository", label: "Repository", icon: "📁", description: "Project structure and files" },
     { id: "build", label: "Build", icon: "🔨", description: "Build automation and execution" },
-    { id: "pipeline", label: "Pipeline", icon: "⚙️", description: "CI/CD pipeline configuration" },
     { id: "tests", label: "Tests", icon: "🧪", description: "Test cases and execution" },
     { id: "deployment", label: "Deploy", icon: "🚀", description: "Deployment simulation" }
   ];
 
   const runTests = useMutation({
     mutationFn: async (tests: TestCase[]) => {
-      setTestRunning(true);
-      const results = await Promise.all(
-        tests.map(async (test) => {
-          // Simulate test execution
-          const passed = Math.random() > 0.3;
-          return {
-            id: test.id,
-            name: test.name,
-            passed,
-            output: passed
-              ? `✓ ${test.name} passed in 245ms`
-              : `✗ ${test.name} failed: assertion error on line 42`
-          };
-        })
-      );
-      setTestRunning(false);
-      return results;
+      const { data } = await api.post(`/projects/${projectId}/tests/run`, {
+        tests,
+        deterministicSeed: Math.abs(projectId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))
+      });
+
+      return data as TestsRunResponse;
     },
-    onSuccess: (results) => {
-      setTestResults(results);
+    onMutate: () => {
+      setTestRunning(true);
+      setTestResults([]);
+      setTestError(null);
+    },
+    onError: (error) => {
+      const errorMessage = getApiErrorMessage(error, "Unable to run tests.");
+      setTestError(errorMessage);
+    },
+    onSuccess: (result) => {
+      setTestResults(result.results);
+      setTestError(null);
+      if (result.pipelineId) {
+        setPipelineId(result.pipelineId);
+      }
+    },
+    onSettled: () => {
+      setTestRunning(false);
     }
   });
 
@@ -167,8 +268,8 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
                     4
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900">Configure Pipeline</p>
-                    <p className="text-sm text-slate-600">Set up your CI/CD pipeline stages</p>
+                    <p className="font-semibold text-slate-900">Add Test Cases</p>
+                    <p className="text-sm text-slate-600">Create deterministic tests and execute them</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -176,8 +277,8 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
                     5
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900">Add Tests & Deploy</p>
-                    <p className="text-sm text-slate-600">Create test cases and configure deployment</p>
+                    <p className="font-semibold text-slate-900">Deploy</p>
+                    <p className="text-sm text-slate-600">Promote successful changes to environments</p>
                   </div>
                 </div>
               </div>
@@ -190,10 +291,10 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
                   📁 View Repository
                 </button>
                 <button
-                  onClick={() => setActiveTab("build")}
+                  onClick={() => setActiveTab("tests")}
                   className="rounded-lg bg-brand-ocean/10 px-4 py-2 font-semibold text-brand-ocean hover:bg-brand-ocean/20"
                 >
-                  🔨 Create Build Script
+                  🧪 Configure Tests
                 </button>
               </div>
             </div>
@@ -219,28 +320,29 @@ export function ProjectWorkspace({ projectId, onBack }: ProjectWorkspaceProps) {
           </div>
         )}
 
-        {activeTab === "pipeline" && (
-          <PipelineSimulator
-            projectId={projectId}
-            onPipelineReady={setPipelineId}
-            pipelineId={pipelineId}
-          />
-        )}
-
         {activeTab === "tests" && (
-          <div className="grid grid-cols-2 gap-6">
-            <TestCaseBuilder
-              projectId={projectId}
-              testCases={testCases}
-              onAddTestCase={(test) => setTestCases([...testCases, test])}
-              onRemoveTestCase={(id) => setTestCases(testCases.filter((t) => t.id !== id))}
-            />
-            <TestRunner
-              testCases={testCases}
-              results={testResults}
-              isRunning={testRunning}
-              onRun={() => runTests.mutate(testCases)}
-            />
+          <div className="space-y-4">
+            {workspaceQuery.isLoading && testCases.length === 0 && (
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                Preparing test suggestions from your repository...
+              </div>
+            )}
+
+            <div className="grid gap-6 xl:grid-cols-2">
+              <TestCaseBuilder
+                projectId={projectId}
+                testCases={testCases}
+                onAddTestCase={(test) => setTestCases([...testCases, test])}
+                onRemoveTestCase={(id) => setTestCases(testCases.filter((t) => t.id !== id))}
+              />
+              <TestRunner
+                testCases={testCases}
+                results={testResults}
+                isRunning={testRunning}
+                error={testError}
+                onRun={() => runTests.mutate(testCases)}
+              />
+            </div>
           </div>
         )}
 

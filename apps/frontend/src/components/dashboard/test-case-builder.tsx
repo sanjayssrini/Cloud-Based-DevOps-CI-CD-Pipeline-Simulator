@@ -38,6 +38,13 @@ export function TestCaseBuilder({
     }
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement) && name && command) {
+      e.preventDefault();
+      handleAddTest();
+    }
+  };
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-4 py-3">
@@ -54,6 +61,7 @@ export function TestCaseBuilder({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyPress={handleKeyPress}
               placeholder="e.g., User Login Test"
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm focus:border-brand-ocean focus:outline-none"
             />
@@ -65,6 +73,7 @@ export function TestCaseBuilder({
               type="text"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
+              onKeyPress={handleKeyPress}
               placeholder="e.g., npm test -- --testNamePattern=login"
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm focus:border-brand-ocean focus:outline-none"
             />

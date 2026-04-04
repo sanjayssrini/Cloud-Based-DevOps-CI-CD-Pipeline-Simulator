@@ -48,8 +48,15 @@ export class ProjectController {
 
   async runBuild(req: Request, res: Response) {
     const projectId = String(req.params.projectId);
-    const { scriptId } = req.body;
-    const buildLog = await projectService.runBuild(projectId, req.user!.userId, scriptId);
+    const { scriptId, deterministicSeed } = req.body;
+    const buildLog = await projectService.runBuild(projectId, req.user!.userId, scriptId, deterministicSeed);
     res.json(buildLog);
+  }
+
+  async runTests(req: Request, res: Response) {
+    const projectId = String(req.params.projectId);
+    const tests = Array.isArray(req.body?.tests) ? req.body.tests : [];
+    const result = await projectService.runTests(projectId, req.user!.userId, tests, req.body?.deterministicSeed);
+    res.json(result);
   }
 }

@@ -32,5 +32,6 @@ router.delete("/:projectId", (req, res, next) => controller.delete(req, res).cat
 
 router.post("/:projectId/scripts", (req, res, next) => controller.saveBuildScript(req, res).catch(next));
 router.post("/:projectId/build", (req, res, next) => controller.runBuild(req, res).catch(next));
+router.post("/:projectId/tests/run", (req, res, next) => controller.runTests(req, res).catch(next));
 
 export default router;

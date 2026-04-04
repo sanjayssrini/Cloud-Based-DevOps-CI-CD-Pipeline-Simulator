@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { useState } from "react";
 import { ProjectCreationForm } from "./project-creation-form";
 
@@ -19,6 +19,7 @@ interface ProjectsListProps {
 
 export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const queryClient = useQueryClient();
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -31,9 +32,25 @@ export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
       await api.delete(`/projects/${projectId}`);
+      return projectId;
     },
-    onSuccess: () => {
-      projectsQuery.refetch();
+    onMutate: async (projectId) => {
+      await queryClient.cancelQueries({ queryKey: ["projects"] });
+      const previousProjects = queryClient.getQueryData<Project[]>(["projects"]);
+      queryClient.setQueryData<Project[]>(["projects"], (current = []) =>
+        current.filter((project) => project.id !== projectId)
+      );
+
+      return { previousProjects };
+    },
+    onError: (error, _projectId, context) => {
+      if (context?.previousProjects) {
+        queryClient.setQueryData(["projects"], context.previousProjects);
+      }
+      alert(getApiErrorMessage(error, "Unable to delete project."));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     }
   });
 
@@ -120,10 +137,12 @@ export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
                     deleteProjectMutation.mutate(project.id);
                   }
                 }}
-                disabled={deleteProjectMutation.isPending}
+                disabled={deleteProjectMutation.isPending && deleteProjectMutation.variables === project.id}
                 className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
-                Delete
+                {deleteProjectMutation.isPending && deleteProjectMutation.variables === project.id
+                  ? "Deleting..."
+                  : "Delete"}
               </button>
             </div>
           </div>
