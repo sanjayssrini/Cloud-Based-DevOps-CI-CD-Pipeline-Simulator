@@ -13,13 +13,14 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "adm-zip": "^0.5.16",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.4.0",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "next": "15.5.14",
     "socket.io": "^4.8.1",
     "uuid": "^11.0.3",
     "zod": "^3.23.8"

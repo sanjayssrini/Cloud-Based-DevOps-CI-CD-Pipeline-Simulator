@@ -11,6 +11,15 @@
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w backend && npm run build -w frontend",
     "prisma:generate": "npm run prisma:generate -w backend",
-    "prisma:migrate": "npm run prisma:migrate -w backend"
+    "prisma:migrate": "npm run prisma:migrate -w backend",
+    "test:webpage": "playwright test --config test/playwright.config.ts",
+    "test:webpage:headed": "playwright test --config test/playwright.config.ts --headed",
+    "test:webpage:report": "playwright show-report",
+    "test:webpage:landing": "playwright test --config test/playwright.config.ts test/landing.spec.ts",
+    "test:webpage:auth": "playwright test --config test/playwright.config.ts test/auth.spec.ts",
+    "test:webpage:dashboard": "playwright test --config test/playwright.config.ts test/dashboard.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.41.2"
   }
 }

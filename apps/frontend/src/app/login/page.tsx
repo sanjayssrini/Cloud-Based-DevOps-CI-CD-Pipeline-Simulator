@@ -47,11 +47,11 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold text-brand-ink">Sign in</h1>
         <p className="mt-1 text-sm text-slate-500">Access your CI/CD simulator workspace.</p>
 
-        <label className="mt-5 block text-sm font-medium text-slate-700">Email</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="you@company.com" />
+        <label htmlFor="login-email" className="mt-5 block text-sm font-medium text-slate-700">Email</label>
+        <input id="login-email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="you@company.com" />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Your password" />
+        <label htmlFor="login-password" className="mt-4 block text-sm font-medium text-slate-700">Password</label>
+        <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Your password" />
 
         <button onClick={() => login.mutate()} disabled={login.isPending || !email || !password} className="mt-6 w-full rounded-lg bg-brand-ocean px-4 py-2 font-semibold text-white disabled:opacity-50">
           {login.isPending ? "Signing in..." : "Sign in"}

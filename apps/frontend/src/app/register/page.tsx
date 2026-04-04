@@ -52,14 +52,14 @@ export default function RegisterPage() {
         <h1 className="text-3xl font-bold text-brand-ink">Create account</h1>
         <p className="mt-1 text-sm text-slate-500">Start your DevOps simulation journey.</p>
 
-        <label className="mt-5 block text-sm font-medium text-slate-700">Name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Your name" />
+        <label htmlFor="register-name" className="mt-5 block text-sm font-medium text-slate-700">Name</label>
+        <input id="register-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Your name" />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">Email</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="you@company.com" />
+        <label htmlFor="register-email" className="mt-4 block text-sm font-medium text-slate-700">Email</label>
+        <input id="register-email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="you@company.com" />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Min 8 characters" />
+        <label htmlFor="register-password" className="mt-4 block text-sm font-medium text-slate-700">Password</label>
+        <input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Min 8 characters" />
 
         <button onClick={() => register.mutate()} disabled={register.isPending || !name || !email || !password} className="mt-6 w-full rounded-lg bg-brand-ink px-4 py-2 font-semibold text-white disabled:opacity-50">
           {register.isPending ? "Creating..." : "Create account"}

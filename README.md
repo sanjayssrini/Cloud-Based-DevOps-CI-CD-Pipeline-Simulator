@@ -26,14 +26,37 @@ Production-grade, fully simulated DevOps learning platform built with Next.js + 
    npm run prisma:generate
    npm run prisma:migrate
    ```
-4. Run backend:
+4. Install Playwright browsers for the webpage tests:
+   ```bash
+   npx playwright install chromium
+   ```
+5. Run backend:
    ```bash
    npm run dev:backend
    ```
-5. Run frontend:
+6. Run frontend:
    ```bash
    npm run dev:frontend
    ```
+
+## Webpage Tests
+
+Browser tests live in [test](test) and cover the landing page, auth pages, and authenticated dashboard flow.
+
+Run them with:
+
+```bash
+npm install
+npm run test:webpage
+```
+
+The Playwright config starts the frontend automatically on `http://127.0.0.1:3000`, and the tests mock the API calls they need.
+
+To run the tests in headed mode:
+
+```bash
+npm run test:webpage:headed
+```
 
 ## System Highlights
 
